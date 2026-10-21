@@ -18,20 +18,41 @@ static int write_answer(char *out, size_t cap, const uint32_t *values, size_t co
     }
     return count == 0;
 }
-
+int p1_step2(uint32_t x, uint32_t y) {
+    return (x + y * 8) ^ 0xc995;
+}
+int p1_step0(uint32_t y, uint32_t z){
+    return (z ^ 0x7aa0) + y * 2;
+}
+int p1_step1(uint32_t b, uint32_t a){
+    return (b - a) * 5 + 0x85f4;
+}
+int p1_compute(uint64_t challenge){
+    uint32_t x  = (uint32_t)(challenge >> 32);
+    uint32_t y  = (uint32_t)challenge;
+    uint64_t z = challenge >> 16;
+    uint32_t a = p1_step2(x, y);
+    uint32_t b = p1_step0(y, z);
+    uint32_t c = p1_step1(b, a);
+    return c;
+}
 int solve_phase_1(uint64_t challenge, char *out, size_t cap) {
-    uint32_t values[MAX_FIELDS] = {0};
-    size_t count = 0;
-    (void)challenge;
-    // TODO: 根据 phase_01 的汇编，用 challenge 算出口令中的各个整数，依次存入 values，并把 count 改为整数个数。
+    uint32_t values[1]={p1_compute(challenge)};
+    uint32_t count = 1;
     return write_answer(out, cap, values, count);
 }
 
 int solve_phase_2(uint64_t challenge, char *out, size_t cap) {
-    uint32_t values[MAX_FIELDS] = {0};
-    size_t count = 0;
-    (void)challenge;
-    // TODO: 根据 phase_02 的汇编，用 challenge 算出口令中的各个整数，依次存入 values，并把 count 改为整数个数。
+    uint32_t values[6];
+    uint32_t count = 6;
+    values[0] = (uint32_t)(((challenge >> 37) & 0xf) + 12);
+    uint32_t prev = values[0];
+    for (uint32_t i = 1, sh = 18; i < 6; i++, sh += 5) {
+        uint32_t t = (uint32_t)(((challenge >> sh) & 0x3f) + i);
+        t ^= prev;
+        values[i] = t * 3;
+        prev = values[i];
+    }
     return write_answer(out, cap, values, count);
 }
 
