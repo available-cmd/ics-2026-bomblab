@@ -182,7 +182,7 @@ int solve_phase_6(uint64_t challenge, char *out, size_t cap) {
 #include <stdint.h>
 #include <string.h>
 
-// 从 secret_mix 汇编逆向出的 C 代码
+
 static uint32_t secret_mix(uint32_t x) {
     uint32_t a = x;
     uint32_t b = x ^ 0xa2dd;
@@ -191,53 +191,48 @@ static uint32_t secret_mix(uint32_t x) {
     return a + b;
 }
 
-// 题目底层的校验函数，如果你需要显式声明
-
-
 int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
-uint32_t c_low  = (uint32_t)challenge;
-    uint32_t c_high = (uint32_t)(challenge >> 32);
-    uint32_t x_low  = (uint32_t)context;
-    uint32_t x_high = (uint32_t)(context >> 32);
+    // 拆解 64 位参数
+    uint32_t ch_low   = (uint32_t)challenge;
+    uint32_t ch_high  = (uint32_t)(challenge >> 32);
+    uint32_t ctx_low  = (uint32_t)context;
+    uint32_t ctx_high = (uint32_t)(context >> 32);
 
-    // 2. 严格按照汇编逻辑计算 v0, v1, v2
-    // v0 计算
-    uint32_t ecx = c_low & 3;
+    // v0 使用 context 的低 2 位！
+    uint32_t ecx = ctx_low & 3; 
     uint32_t v0  = ecx;
 
-    // 中间变量计算
-    uint32_t r9d = (ecx * 0xa2dd) ^ ((uint32_t)(challenge >> 16));
-    
-    uint32_t edi = (x_high ^ x_low) ^ (c_high ^ c_low);
-    uint32_t m   = secret_mix(edi);
-    
-    uint32_t v1  = m ^ r9d;
+    // r9d 使用 context
+    uint32_t r9d = (ecx * 0xa2dd) ^ ((uint32_t)(context >> 16));
 
-    uint32_t r8d = c_high ^ c_low;
-    uint32_t esi = x_high ^ x_low;
-    uint32_t t   = (r8d + ecx + 0x48c2) + (esi >> 3);
-    uint32_t v2  = m ^ t;
+    
+    // edi 是 challenge 的高低位异或 与 context 的高低位异或
+    uint32_t ch_xor = ch_high ^ ch_low;
+    uint32_t ctx_xor = ctx_high ^ ctx_low;
+    uint32_t edi = ch_xor ^ ctx_xor;
+    uint32_t m = secret_mix(edi);
+    uint32_t esi_shifted = ch_xor >> 3;
+    uint32_t v1  = m ^ r9d;      // 汇编: shr $0x3, %esi
+    uint32_t edx         = ctx_xor + ecx + 0x48c2;   // 汇编: lea 0x48c2(%r8,%rcx,1)
+    edx                 += esi_shifted;              // 汇编: add %esi, %edx
+    uint32_t v2          = m ^ edx;    
 
-    // 3. 构造第七行口令
+
+
+    // 拼接输出
     char buf[200];
-    
-    // 前 32 个字符填 'A' (不能有 \0 截断)
     memset(buf, 'A', 32);
-    
-    // 偏移 32 处必须是 "OPEN"
     memcpy(buf + 32, "OPEN", 4);
-    
-    // 偏移 36 处紧跟数字（注意：格式串 "%u %u %u" 前面绝对不能有空格！）
-    // 题目要求是无符号十进制，所以用 %u
     snprintf(buf + 36, sizeof(buf) - 36, "%u %u %u", v0, v1, v2);
 
-    // 4. 检查 out 缓冲区并写入
-    size_t len = strlen(buf);
-    if (out == NULL || cap < len + 1) {
-        return -1; // 缓冲区太小
+    if (out == NULL || cap < strlen(buf) + 1) {
+        return -1;
     }
-    
     snprintf(out, cap, "%s", buf);
 
-    return 0; // 成功返回 0
+    return 0;
 }
+
+// 把刚才的 solve_secret 和 secret_mix 放在这里...
+
+
