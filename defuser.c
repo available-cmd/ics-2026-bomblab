@@ -195,20 +195,22 @@ static uint32_t secret_mix(uint32_t x) {
 
 
 int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
-    // 1. 拆解 64 位参数的高低 32 位
-    uint32_t c_low  = (uint32_t)challenge;
+uint32_t c_low  = (uint32_t)challenge;
     uint32_t c_high = (uint32_t)(challenge >> 32);
     uint32_t x_low  = (uint32_t)context;
     uint32_t x_high = (uint32_t)(context >> 32);
 
-    // 2. 根据 secret_phase 的汇编逻辑计算 v0, v1, v2
+    // 2. 严格按照汇编逻辑计算 v0, v1, v2
+    // v0 计算
     uint32_t ecx = c_low & 3;
     uint32_t v0  = ecx;
 
+    // 中间变量计算
     uint32_t r9d = (ecx * 0xa2dd) ^ ((uint32_t)(challenge >> 16));
     
     uint32_t edi = (x_high ^ x_low) ^ (c_high ^ c_low);
     uint32_t m   = secret_mix(edi);
+    
     uint32_t v1  = m ^ r9d;
 
     uint32_t r8d = c_high ^ c_low;
@@ -216,15 +218,26 @@ int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
     uint32_t t   = (r8d + ecx + 0x48c2) + (esi >> 3);
     uint32_t v2  = m ^ t;
 
-    // 3. 构造完整的第七行输入
-   char buf[200];
-memset(buf, 'A', 32);                   // 前 32 个字符，填满 A
-memcpy(buf + 32, "OPEN", 4);            // 偏移 32 处必须是 OPEN
-snprintf(buf + 36, sizeof(buf) - 36, "%u %u %u", v0, v1, v2); // 偏移 36 处直接写数字（注意：%u前面没有空格！）
+    // 3. 构造第七行口令
+    char buf[200];
+    
+    // 前 32 个字符填 'A' (不能有 \0 截断)
+    memset(buf, 'A', 32);
+    
+    // 偏移 32 处必须是 "OPEN"
+    memcpy(buf + 32, "OPEN", 4);
+    
+    // 偏移 36 处紧跟数字（注意：格式串 "%u %u %u" 前面绝对不能有空格！）
+    // 题目要求是无符号十进制，所以用 %u
+    snprintf(buf + 36, sizeof(buf) - 36, "%u %u %u", v0, v1, v2);
 
-// 写入 out
-size_t len = strlen(buf);
-if (out == NULL || cap < len + 1) return -1;
-snprintf(out, cap, "%s", buf);
-return 0;
+    // 4. 检查 out 缓冲区并写入
+    size_t len = strlen(buf);
+    if (out == NULL || cap < len + 1) {
+        return -1; // 缓冲区太小
+    }
+    
+    snprintf(out, cap, "%s", buf);
+
+    return 0; // 成功返回 0
 }
