@@ -48,9 +48,11 @@ int solve_phase_2(uint64_t challenge, char *out, size_t cap) {
     size_t count = 6;
     values[0] = (uint32_t)(((challenge >> 37) & 0xf) + 12);
     uint32_t prev = values[0];
-    for (uint32_t i = 1, sh = 18; i < 6; i++, sh += 5) {
-        uint32_t t = (uint32_t)(((challenge >> sh) & 0x3f) + i);
+    uint32_t j = 18;
+    for (uint32_t i = 1; i < 6; i++) {
+        uint32_t t = (uint32_t)(((challenge >> j) & 0x3f) + i);
         t ^= prev;
+        j += 5;
         values[i] = t * 3;
         prev = values[i];
     }
@@ -58,8 +60,8 @@ int solve_phase_2(uint64_t challenge, char *out, size_t cap) {
 }
 //------------------------------------------------
 
-uint32_t p3_dispatch(uint32_t idx, uint32_t x) {
-    switch (idx) {
+uint32_t p3_dispatch(uint32_t i, uint32_t x) {
+    switch (i) {
         case 0: return 5u * x + 0x329bu;
         case 1: return 5u * x + 0x70cbu;
         case 2: return (x ^ 0x4c5bu) + (x >> 2);
@@ -80,7 +82,7 @@ int solve_phase_3(uint64_t challenge, char *out, size_t cap) {
 }
 //--------------------------------------------------------------
 uint32_t p4_walk(uint32_t x, int lo, int hi, uint32_t key) {
-    uint32_t mid = lo + (hi - lo) / 2;
+    uint32_t mid =  (hi + lo) / 2;
     if (mid == x)
         return (mid + 0xc7) ^ key;
     uint32_t ebx = mid + key;
@@ -100,46 +102,44 @@ int solve_phase_4(uint64_t challenge, char *out, size_t cap) {
 }
 //---------------------------------------------------------------------
 struct node {
-    uint32_t f0;        // +0
-    uint32_t f4;        // +4
-    struct node *next;  // +8
+    uint32_t f0;
+    uint32_t f4;
+    struct node *next;
 };
 static struct node p5_nodes[12] = {
-    /* 0x405b60 */ { 0x98e7, 0x0a5a, &p5_nodes[5]  },  /* next=0x405bb0 */
-    /* 0x405b70 */ { 0xd00e, 0x026e, &p5_nodes[0]  },  /* next=0x405b60 */
-    /* 0x405b80 */ { 0x6cc0, 0x0118, &p5_nodes[9]  },  /* next=0x405bf0 */
-    /* 0x405b90 */ { 0x6488, 0x0915, &p5_nodes[11] },  /* next=0x405c10 */
-    /* 0x405ba0 */ { 0x19c7, 0x073d, &p5_nodes[3]  },  /* next=0x405b90 */
-    /* 0x405bb0 */ { 0x2355, 0x0027, &p5_nodes[2]  },  /* next=0x405b80 */
-    /* 0x405bc0 */ { 0xe273, 0x066c, &p5_nodes[1]  },  /* next=0x405b70 */
-    /* 0x405bd0 */ { 0xd77c, 0x0434, &p5_nodes[6]  },  /* next=0x405bc0 */
-    /* 0x405be0 */ { 0x554e, 0x0b60, NULL          },  /* next=0 */
-    /* 0x405bf0 */ { 0xc5de, 0x0817, &p5_nodes[8]  },  /* next=0x405be0 */
-    /* 0x405c00 */ { 0xe611, 0x0312, &p5_nodes[7]  },  /* next=0x405bd0 */
-    /* 0x405c10 */ { 0x3f29, 0x0549, &p5_nodes[10] },  /* next=0x405c00 */
+{0x98e7, 0x0a5a, &p5_nodes[5]},
+{0xd00e, 0x026e, &p5_nodes[0]},
+{0x6cc0, 0x0118, &p5_nodes[9]},
+{0x6488, 0x0915, &p5_nodes[11]},
+{0x19c7, 0x073d, &p5_nodes[3]},
+{0x2355, 0x0027, &p5_nodes[2]},
+{0xe273, 0x066c, &p5_nodes[1]},
+{0xd77c, 0x0434, &p5_nodes[6]},
+{0x554e, 0x0b60, NULL},
+{0xc5de, 0x0817, &p5_nodes[8]},
+{0xe611, 0x0312, &p5_nodes[7]},
+{0x3f29, 0x0549, &p5_nodes[10]},
 };
 
 static struct node *p5_heads[8] = {
-    &p5_nodes[4],   /* 0x405ba0 */
-    &p5_nodes[3],   /* 0x405b90 */
-    &p5_nodes[11],  /* 0x405c10 */
-    &p5_nodes[10],  /* 0x405c00 */
-    &p5_nodes[7],   /* 0x405bd0 */
-    &p5_nodes[6],   /* 0x405bc0 */
-    &p5_nodes[1],   /* 0x405b70 */
-    &p5_nodes[0],   /* 0x405b60 */
+    &p5_nodes[4],
+    &p5_nodes[3],
+    &p5_nodes[11],
+    &p5_nodes[10],
+    &p5_nodes[7],
+    &p5_nodes[6],
+    &p5_nodes[1],
+    &p5_nodes[0],
 };
 uint32_t p5_traverse(uint64_t x, uint32_t *out)
 {
     struct node *n = p5_heads[x & 7];
-    uint32_t eax = (uint32_t)(x >> 6) ^ (uint32_t)(x >> 32)
-                 ^ n->f0 ^ 0xf243u;
+    uint32_t eax = (uint32_t)(x >> 6) ^ (uint32_t)(x >> 32)^ n->f0 ^ 0xf243u;
     eax += n->f4;
     *out = n->f4;
-
-    unsigned count = (unsigned)(x >> 3) & 3;   // 0..3
+    unsigned count = (unsigned)(x >> 3) & 3;
     unsigned i = 1;
-    while (i <= count) {          // 走 count 步
+    while (i <= count) {
         n = n->next;
         eax ^= n->f0;
         eax += n->f4;
@@ -151,38 +151,39 @@ uint32_t p5_traverse(uint64_t x, uint32_t *out)
 int solve_phase_5(uint64_t challenge, char *out, size_t cap) {
     uint32_t values[2];
     size_t count = 2;
-    uint32_t last_f4;                       // 对应 -0x14(%rbp)，p5_traverse 的第 2 个参数
+    uint32_t last_f4;
     uint32_t ret = p5_traverse(challenge, &last_f4);
-    values[0] = ret;                        // 对应 -0x1c(%rbp)，sscanf 第 1 个数
+    values[0] = ret;
     values[1] = last_f4;   
-    // TODO: 根据 phase_05 的汇编，用 challenge 算出口令中的各个整数，依次存入 values，并把 count 改为整数个数。
     return write_answer(out, cap, values, count);
 }
 //------------------------------------------------------------------------------
-static uint32_t f_490(uint32_t a){ return (a ^ 0xc379u) + 4u*a; }
-static uint32_t f_4a0(uint32_t a){ return ((a<<7)|(a>>25)) ^ 0x8b4bu; }
-static uint32_t f_4b0(uint32_t a){ return (a + 0x5cc9u) ^ (a >> 5); }
-static uint32_t f_4c0(uint32_t a){ return ((a >> 7) ^ a) + 0x4a15u; }
-static uint32_t f_4e0(uint32_t a){ return (4u*a + 0xc948u) ^ (3u*a); }
-static uint32_t f_500(uint32_t a){ return (a >> 1) | (a << 31); }
+static uint32_t f_490(uint32_t a){return (a ^ 0xc379u) + 4u*a;}
+static uint32_t f_4a0(uint32_t a){return ((a<<7)|(a>>25)) ^ 0x8b4bu;}
+static uint32_t f_4b0(uint32_t a){return (a + 0x5cc9u) ^ (a >> 5);}
+static uint32_t f_4c0(uint32_t a){return ((a >> 7) ^ a) + 0x4a15u;}
+static uint32_t f_4e0(uint32_t a){return (4u*a + 0xc948u) ^ (3u*a);}
+static uint32_t f_500(uint32_t a){return (a >> 1) | (a << 31);}
 static uint32_t (*const p6_ops[8])(uint32_t) = {
     f_490, f_4e0, f_4e0, f_4c0, f_500, f_4a0, f_4c0, f_4b0
 };
+uint32_t p6_dispatch(uint64_t x)
+{
+    uint32_t edi = (uint32_t)(x >> 6) ^ (uint32_t)(x >> 32);
+    uint32_t eax = p6_ops[x & 7](edi);
+    eax ^= 0x625;
+    eax = p6_ops[(x & 0x38) >> 3](eax);
+    eax += 0x3f57;
+    return eax;
+}
 int solve_phase_6(uint64_t challenge, char *out, size_t cap) {
     size_t count =1;
-    uint32_t edi = (uint32_t)(challenge >> 6) ^ (uint32_t)(challenge >> 32);
-    uint32_t eax = p6_ops[challenge & 7u](edi);
-    eax ^= 0x625u;
-    eax = p6_ops[(challenge & 0x38u) >> 3](eax);
-    eax += 0x3f57u;
-    uint32_t values[1] = {eax};
+    uint32_t values[1] = {p6_dispatch(challenge)};
     return write_answer(out, cap, values, count);
 }
 //-----------------------------------------------------
 #include <stdint.h>
 #include <string.h>
-
-
 static uint32_t secret_mix(uint32_t x) {
     uint32_t a = x;
     uint32_t b = x ^ 0xa2dd;
@@ -190,49 +191,28 @@ static uint32_t secret_mix(uint32_t x) {
     a ^= 0x48c2;
     return a + b;
 }
-
 int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
-    // 拆解 64 位参数
     uint32_t ch_low   = (uint32_t)challenge;
     uint32_t ch_high  = (uint32_t)(challenge >> 32);
     uint32_t ctx_low  = (uint32_t)context;
     uint32_t ctx_high = (uint32_t)(context >> 32);
-
-    // v0 使用 context 的低 2 位！
-    uint32_t ecx = ctx_low & 3; 
+    uint32_t ecx = ctx_low & 3;
     uint32_t v0  = ecx;
-
-    // r9d 使用 context
     uint32_t r9d = (ecx * 0xa2dd) ^ ((uint32_t)(context >> 16));
-
-    
-    // edi 是 challenge 的高低位异或 与 context 的高低位异或
-    uint32_t ch_xor = ch_high ^ ch_low;
-    uint32_t ctx_xor = ctx_high ^ ctx_low;
-    uint32_t edi = ch_xor ^ ctx_xor;
-    uint32_t m = secret_mix(edi);
-    uint32_t esi_shifted = ch_xor >> 3;
-    uint32_t v1  = m ^ r9d;      // 汇编: shr $0x3, %esi
-    uint32_t edx         = ctx_xor + ecx + 0x48c2;   // 汇编: lea 0x48c2(%r8,%rcx,1)
-    edx                 += esi_shifted;              // 汇编: add %esi, %edx
-    uint32_t v2          = m ^ edx;    
-
-
-
-    // 拼接输出
+    uint32_t esi = ch_high ^ ch_low;
+    uint32_t r8d = ctx_high ^ ctx_low;
+    uint32_t edi = esi ^ r8d;
+    uint32_t m   = secret_mix(edi);
+    uint32_t v1  = m ^ r9d;
+    uint32_t esi_shifted = esi >> 3;
+    uint32_t edx         = r8d + ecx + 0x48c2;
+    edx                 += esi_shifted;
+    uint32_t v2          = v1 ^ edx;  
     char buf[200];
     memset(buf, 'A', 32);
     memcpy(buf + 32, "OPEN", 4);
     snprintf(buf + 36, sizeof(buf) - 36, "%u %u %u", v0, v1, v2);
-
-    if (out == NULL || cap < strlen(buf) + 1) {
-        return -1;
-    }
+    if (out == NULL || cap < strlen(buf) + 1) return -1;
     snprintf(out, cap, "%s", buf);
-
     return 0;
 }
-
-// 把刚才的 solve_secret 和 secret_mix 放在这里...
-
-
