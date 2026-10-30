@@ -186,28 +186,24 @@ int solve_phase_6(uint64_t challenge, char *out, size_t cap) {
 #include <string.h>
 static uint32_t secret_mix(uint32_t x) {
     uint32_t a = x;
-    uint32_t b = x ^ 0xa2dd;
+    uint32_t b = x ^ 0xa2ddu;
     a >>= 3;
-    a ^= 0x48c2;
+    a ^= 0x48c2u;
     return a + b;
 }
 int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
-    uint32_t ch_low   = (uint32_t)challenge;
-    uint32_t ch_high  = (uint32_t)(challenge >> 32);
-    uint32_t ctx_low  = (uint32_t)context;
-    uint32_t ctx_high = (uint32_t)(context >> 32);
-    uint32_t ecx = ctx_low & 3;
-    uint32_t v0  = ecx;
-    uint32_t r9d = (ecx * 0xa2dd) ^ ((uint32_t)(context >> 16));
-    uint32_t esi = ch_high ^ ch_low;
-    uint32_t r8d = ctx_high ^ ctx_low;
+    uint32_t v0  = context & 3u;
+    uint32_t r9d = (v0 * 0xa2ddu) ^ ((uint32_t)(context >> 16));
+    uint32_t esi = (uint32_t)(challenge >> 32) ^ (uint32_t)challenge;
+    uint32_t r8d = (uint32_t)(context >> 32) ^ context;
     uint32_t edi = esi ^ r8d;
     uint32_t m   = secret_mix(edi);
     uint32_t v1  = m ^ r9d;
-    uint32_t esi_shifted = esi >> 3;
-    uint32_t edx         = r8d + ecx + 0x48c2;
-    edx                 += esi_shifted;
-    uint32_t v2          = v1 ^ edx;  
+    esi = esi >> 3;
+    uint32_t edx = r8d + v0 + 0x48c2u;
+    edx += esi;
+    uint32_t v2 = v1 ^ edx;  
+
     char buf[200];
     memset(buf, 'A', 32);
     memcpy(buf + 32, "OPEN", 4);
